@@ -57,11 +57,14 @@ args = dict(
         'qtpy',
         'pyqtgraph',
         'qtwidgets',
-        'intelhex'
+        'intelhex',
+        'python-can',
     ],
     # We can't use "scripts" here, because generated shims don't work with multiprocessing pickler.
     entry_points={
-        'gui_scripts': [
+        # console_scripts keeps a terminal on Windows so startup errors are visible
+        # instead of the process appearing to flash-exit via pythonw.
+        'console_scripts': [
             '{0}={0}.main:main'.format(PACKAGE_NAME),
         ]
     },

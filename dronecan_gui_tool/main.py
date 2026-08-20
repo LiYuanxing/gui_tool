@@ -12,6 +12,7 @@ import os
 import sys
 import time
 import tempfile
+import traceback
 
 assert sys.version[0] == '3'
 
@@ -32,17 +33,15 @@ if args.debug:
 else:
     logging_level = logging.INFO
 
-logging.basicConfig(stream=sys.stderr, level=logging_level,
-                    format='%(asctime)s %(levelname)s %(name)s %(message)s')
-
-log_file = tempfile.NamedTemporaryFile(mode='w', prefix='dronecan_gui_tool-', suffix='.log', delete=False)
-file_handler = logging.FileHandler(log_file.name)
-file_handler.setLevel(logging_level)
-file_handler.setFormatter(logging.Formatter('%(asctime)s [%(process)d] %(levelname)-8s %(name)-25s %(message)s'))
-logging.root.addHandler(file_handler)
+_LOG_FORMAT = '%(asctime)s %(levelname)s %(name)s %(message)s'
+_log_path = os.path.join(tempfile.gettempdir(), 'dronecan_gui_tool.log')
+_log_handlers = [logging.FileHandler(_log_path, encoding='utf-8')]
+if sys.stderr is not None:
+    _log_handlers.append(logging.StreamHandler(sys.stderr))
+logging.basicConfig(level=logging_level, format=_LOG_FORMAT, handlers=_log_handlers)
 
 logger = logging.getLogger(__name__.replace('__', ''))
-logger.info('Spawned')
+logger.info('Spawned; log file: %s', _log_path)
 
 #
 # Applying Windows-specific hacks
@@ -61,6 +60,8 @@ if multiprocessing.get_start_method(True) != 'spawn':
 # Importing other stuff once the logging has been configured
 #
 import dronecan
+from .python_can_compat import apply_python_can_compat
+apply_python_can_compat()
 
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QSplitter, QAction
 from PyQt5.QtGui import QKeySequence, QDesktopServices
@@ -572,6 +573,18 @@ class MainWindow(QMainWindow):
         super(MainWindow, self).closeEvent(qcloseevent)
 
 def main():
+    def _excepthook(exc_type, exc, tb):
+        if issubclass(exc_type, SystemExit):
+            sys.__excepthook__(exc_type, exc, tb)
+            return
+        details = ''.join(traceback.format_exception(exc_type, exc, tb))
+        logger.error('Uncaught exception\n%s', details)
+        try:
+            show_error('Fatal error', 'Application crashed. See %s' % _log_path, details, blocking=True)
+        except Exception:
+            pass
+
+    sys.excepthook = _excepthook
     logger.info('Starting the application')
     app = QApplication(sys.argv)
 

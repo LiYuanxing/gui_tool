@@ -21,6 +21,26 @@ from functools import partial
 
 logger = getLogger(__name__)
 
+# qtawesome 1.x ships Font Awesome 5/6 (fa5s/fa6s), not the old FA4 "fa." prefix.
+_ICON_PREFIXES = ('fa5s', 'fa6s', 'fa5', 'fa6', 'mdi', 'mdi6')
+_FA4_TO_FA5 = {
+    'area-chart': 'chart-area',
+    'dashboard': 'tachometer-alt',
+    'file-code-o': 'file-code',
+    'file-o': 'file',
+    'flash': 'bolt',
+    'folder-open-o': 'folder-open',
+    'hand-stop-o': 'hand-paper',
+    'newspaper-o': 'newspaper',
+    'pencil-square-o': 'edit',
+    'refresh': 'sync',
+    'remove': 'times',
+    'sign-out': 'sign-out-alt',
+    'trash-o': 'trash',
+    'video-camera': 'video',
+    'warning': 'exclamation-triangle',
+}
+
 
 def show_error(title, text, informative_text, parent=None, blocking=False):
     mbox = QMessageBox(parent)
@@ -588,7 +608,28 @@ class RealtimeLogWidget(QWidget):
 
 
 def get_icon(name):
-    return qtawesome.icon('fa.' + name)
+    """Load a QtAwesome icon. Newer qtawesome dropped Font Awesome 4's 'fa.' prefix."""
+    if not name:
+        return QIcon()
+    if '.' in name:
+        specs = [name]
+    else:
+        mapped = _FA4_TO_FA5.get(name, name)
+        stripped = name[:-2] if name.endswith('-o') else name
+        names = []
+        for candidate in (mapped, name, stripped):
+            if candidate and candidate not in names:
+                names.append(candidate)
+        specs = ['%s.%s' % (prefix, icon_name)
+                 for icon_name in names
+                 for prefix in _ICON_PREFIXES]
+    for spec in specs:
+        try:
+            return qtawesome.icon(spec)
+        except Exception:
+            continue
+    logger.warning('Unknown icon %r', name)
+    return QIcon()
 
 
 def make_icon_button(icon_name, tool_tip, parent, checkable=False, checked=False, on_clicked=None, text=''):

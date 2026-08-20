@@ -65,6 +65,43 @@ def _mavcan_interfaces():
         return []
     return ['mavcan::14550']
 
+
+_pcan_cache_lock = threading.Lock()
+_pcan_cache = {'ts': 0.0, 'ifaces': OrderedDict()}
+_PCAN_CACHE_TTL = 2.0
+
+
+def _pcan_interfaces():
+    """Return OrderedDict of PEAK PCAN adapters discovered via python-can.
+
+    Keys are human-readable labels shown in the combo box; values are the
+    channel names that pydronecan.make_driver() understands (PCAN_USBBUS1, ...).
+    """
+    now = time.time()
+    with _pcan_cache_lock:
+        if now - _pcan_cache['ts'] < _PCAN_CACHE_TTL:
+            return OrderedDict(_pcan_cache['ifaces'])
+
+    out = OrderedDict()
+    try:
+        from can import detect_available_configs
+        for cfg in detect_available_configs(interfaces=['pcan'], timeout=2.0):
+            if cfg.get('interface') != 'pcan':
+                continue
+            channel = cfg.get('channel')
+            if not channel:
+                continue
+            device_name = cfg.get('device_name') or 'PCAN'
+            label = '%s [%s]' % (device_name, channel)
+            out[label] = channel
+    except Exception as ex:
+        logger.warning('Could not enumerate PCAN interfaces: %s', ex, exc_info=True)
+
+    with _pcan_cache_lock:
+        _pcan_cache['ts'] = time.time()
+        _pcan_cache['ifaces'] = OrderedDict(out)
+    return out
+
 def list_ifaces():
     """Returns dictionary, where key is description, value is the OS assigned name of the port"""
     logger.debug('Updating iface list...')
@@ -90,6 +127,7 @@ def list_ifaces():
         out = OrderedDict()
         for x in ifaces:
             out[x] = x
+        out.update(_pcan_interfaces())
 
         return out
     else:
@@ -113,13 +151,7 @@ def list_ifaces():
         for x in mifaces:
             out[x] = x
 
-        try:
-            from can import detect_available_configs
-            for interface in detect_available_configs():
-                if interface['interface'] == "pcan":
-                    out[interface['channel']] = interface['channel']
-        except Exception as ex:
-            logger.warning('Could not load can interfaces: %s', ex, exc_info=True)
+        out.update(_pcan_interfaces())
 
         return out
 
@@ -161,7 +193,7 @@ def run_setup_window(icon, dsdl_path=None):
     win.setWindowTitle('Application Setup')
     win.setWindowIcon(icon)
     win.setWindowFlags(Qt.CustomizeWindowHint | Qt.WindowTitleHint | Qt.WindowCloseButtonHint)
-    win.setAttribute(Qt.WA_DeleteOnClose)              # This is required to stop background timers!
+    win.setWindowModality(Qt.ApplicationModal)
 
     combo = QComboBox(win)
     combo.setEditable(True)
@@ -242,9 +274,10 @@ def run_setup_window(icon, dsdl_path=None):
 
     result = None
     kwargs = {}
+    dsdl_dir = dsdl_path
 
     def on_ok():
-        nonlocal result, kwargs
+        nonlocal result, kwargs, dsdl_dir
         try:
             baud_rate_value = int(baudrate.currentText())
         except ValueError:
@@ -272,6 +305,7 @@ def run_setup_window(icon, dsdl_path=None):
             result = ifaces[result_key]
         except KeyError:
             result = result_key
+        dsdl_dir = dir_selection.get_selection()
         win.close()
 
     ok.clicked.connect(on_ok)
@@ -314,6 +348,10 @@ def run_setup_window(icon, dsdl_path=None):
         timer.setSingleShot(False)
         timer.timeout.connect(update_iface_list)
         timer.start(int(BackgroundIfaceListUpdater.UPDATE_INTERVAL / 2 * 1000))
+        win.show()
+        win.raise_()
+        win.activateWindow()
         win.exec()
+        timer.stop()
 
-    return result, kwargs, dir_selection.get_selection()
+    return result, kwargs, dsdl_dir
