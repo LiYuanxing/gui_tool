@@ -17,6 +17,13 @@ Read installation instructions:
 
 ## Installing on GNU/Linux
 
+日常怎么跑
+在 PowerShell 里：
+
+cd d:\2.uav\gui_tool
+.\.venv\Scripts\Activate.ps1
+dronecan_gui_too
+
 The general approach is simple:
 
 1. Install PyQt5 for Python 3 using your OS' package manager (e.g. APT).

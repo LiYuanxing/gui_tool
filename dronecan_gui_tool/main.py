@@ -61,7 +61,9 @@ if multiprocessing.get_start_method(True) != 'spawn':
 #
 import dronecan
 from .python_can_compat import apply_python_can_compat
+from .dsdl_loader import load_vendor_dsdl
 apply_python_can_compat()
+load_vendor_dsdl()
 
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QSplitter, QAction
 from PyQt5.QtGui import QKeySequence, QDesktopServices
@@ -550,6 +552,22 @@ class MainWindow(QMainWindow):
         try:
             self._node.spin(0)
             self._successive_node_errors = 0
+        except dronecan.transport.TransferError as ex:
+            # Unknown DSDL IDs should not tear down the node; they just cannot be decoded.
+            if 'Unrecognised' in str(ex):
+                logger.debug('%s', ex)
+                return
+            self._successive_node_errors += 1
+            msg = 'Node spin error [%d of %d]: %r' % (self._successive_node_errors, self.MAX_SUCCESSIVE_NODE_ERRORS, ex)
+            if self._successive_node_errors >= self.MAX_SUCCESSIVE_NODE_ERRORS:
+                show_error('Node failure',
+                           'Local DroneCAN node has generated too many errors and will be terminated.\n'
+                           'Please restart the application.',
+                           msg, self)
+                self._node_spin_timer.stop()
+                self._node.close()
+            logger.error(msg, exc_info=True)
+            self.statusBar().showMessage(msg, 3000)
         except Exception as ex:
             self._successive_node_errors += 1
 
@@ -604,7 +622,7 @@ def main():
         try:
             if dsdl_directory:
                 logger.info('Loading custom DSDL from %r', dsdl_directory)
-                dronecan.load_dsdl(dsdl_directory)
+                load_vendor_dsdl(dsdl_directory)
                 logger.info('Custom DSDL loaded successfully')
 
                 # setup an environment variable for sub-processes to know where to load custom DSDL from

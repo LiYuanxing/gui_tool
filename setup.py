@@ -90,7 +90,13 @@ args = dict(
         'Environment :: Win32 (MS Windows)',
         'Environment :: MacOS X',
     ],
-    package_data={'DroneCAN_GUI_Tool': [ 'icons/*.png', 'icons/*.ico']}
+    package_data={
+        'dronecan_gui_tool': [
+            'dsdl/**/*.uavcan',
+            'icons/*.png',
+            'icons/*.ico',
+        ]
+    }
 )
 
 if sys.platform.startswith('linux') or sys.platform.startswith('darwin'):

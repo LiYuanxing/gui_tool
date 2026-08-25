@@ -24,6 +24,7 @@ class PlotContainerWidget(QDockWidget):
         self.on_close = lambda: None
 
         self._plot_area = plot_area_class(self, display_measurements=self.setWindowTitle)
+        self._plot_area_class = plot_area_class
 
         self.update = self._plot_area.update
         self.reset = self._plot_area.reset
@@ -85,7 +86,8 @@ class PlotContainerWidget(QDockWidget):
 
             widget.on_remove = remove
 
-        win = NewValueExtractorWindow(self, self._active_data_types)
+        win = NewValueExtractorWindow(self, self._active_data_types,
+                                      xy_mode=self._plot_area_class.__name__ == 'PlotAreaXYWidget')
         win.on_done = done
         win.show()
 

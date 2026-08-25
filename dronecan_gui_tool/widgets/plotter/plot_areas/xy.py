@@ -161,11 +161,14 @@ class PlotAreaXYWidget(QWidget, AbstractPlotArea):
 
     def add_value(self, extractor, _timestamp, xy):
         try:
-            x, y = xy
+            seq = list(xy)
+            if len(seq) < 2:
+                raise ValueError('need 2 values')
+            x, y = seq[0], seq[1]
         except Exception:
             if extractor in self._extractor_associations:
                 self.remove_curves_provided_by_extractor(extractor)
-            raise RuntimeError('XY must be an iterable with exactly 2 elements')
+            raise RuntimeError('XY plot needs two numbers, e.g. msg.torque_xyz[0], msg.thrust_xyz[2]')
 
         if extractor not in self._extractor_associations:
             self._extractor_associations[extractor] = self._forge_curve(extractor.color)

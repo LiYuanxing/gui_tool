@@ -1,0 +1,8 @@
+#
+# Normalized control setpoint from PX4
+#
+
+uavcan.Timestamp timestamp_sample
+
+float32[3] torque_xyz   # normalized roll/pitch/yaw torque
+float32[3] thrust_xyz   # normalized body-frame thrust [-1, 1]

@@ -55,6 +55,10 @@ IPC_COMMAND_STOP = 'stop'
 
 def _process_entry_point(channel):
     logger.info('Plotter process started with PID %r', os.getpid())
+    # Child process does not inherit DSDL loaded by the GUI; vendor types must be loaded again.
+    from ...dsdl_loader import load_vendor_dsdl
+    load_vendor_dsdl()
+
     app = QApplication(sys.argv)    # Inheriting args from the parent process
 
     def exit_if_should():

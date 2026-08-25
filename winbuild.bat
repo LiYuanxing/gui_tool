@@ -11,7 +11,17 @@ rem - step 3 - run winbuild.bat in the gui_tool directory
 
 rem NOTE: you need visual studio installed, with the C++ build tools
 
-SET PATH=f:\WinPython;%PATH%
+rem Prefer the local Python 3.10 venv if present; otherwise use a system Python.
+IF EXIST "%~dp0.venv\Scripts\python.exe" (
+  SET "PATH=%~dp0.venv\Scripts;%PATH%"
+) ELSE (
+  rem Prefer the local Python 3.10 venv if present; otherwise use a system Python.
+IF EXIST "%~dp0.venv\Scripts\python.exe" (
+  SET "PATH=%~dp0.venv\Scripts;%PATH%"
+) ELSE (
+  SET PATH=f:\WinPython;%PATH%
+)
+)
 
 python --version
 

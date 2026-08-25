@@ -26,6 +26,27 @@ DEFAULT_COLORS = [
 ]
 
 
+def _default_extraction_expression(data_type, xy_mode=False):
+    """Pick a numeric field. Skip nested structs such as uavcan.Timestamp."""
+    for field in getattr(data_type, 'fields', []):
+        t = field.type
+        if t.category == t.CATEGORY_VOID:
+            continue
+        if t.category == t.CATEGORY_PRIMITIVE:
+            if xy_mode:
+                continue
+            return '%s.%s' % (EXPRESSION_VARIABLE_FOR_MESSAGE, field.name)
+        if t.category == t.CATEGORY_ARRAY and \
+                t.value_type.category == t.value_type.CATEGORY_PRIMITIVE:
+            name = '%s.%s' % (EXPRESSION_VARIABLE_FOR_MESSAGE, field.name)
+            if xy_mode:
+                return '%s[0], %s[1]' % (name, name)
+            return name
+        if t.category == t.CATEGORY_COMPOUND:
+            continue  # skip nested structs such as uavcan.Timestamp
+    return None
+
+
 def _make_expression_completer(owner, data_type):
     model = QStringListModel()
     comp = QCompleter(owner)
@@ -97,13 +118,14 @@ class DefaultColorRotator:
 class NewValueExtractorWindow(QDialog):
     default_color_rotator = DefaultColorRotator()
 
-    def __init__(self, parent, active_data_types):
+    def __init__(self, parent, active_data_types, xy_mode=False):
         super(NewValueExtractorWindow, self).__init__(parent)
         self.setAttribute(Qt.WA_DeleteOnClose)              # This is required to stop background timers!
         self.setWindowTitle('New Plot')
         self.setModal(True)
 
         self._active_data_types = active_data_types
+        self._xy_mode = xy_mode
         self.on_done = print
 
         # Message type selection box
@@ -127,7 +149,12 @@ class NewValueExtractorWindow(QDialog):
         # Existence is torment.
         self._extraction_expression_box = QLineEdit(self)
         self._extraction_expression_box.setFont(get_monospace_font())
-        self._extraction_expression_box.setToolTip('Example: msg.cmd[0] / 16384')
+        if xy_mode:
+            self._extraction_expression_box.setToolTip(
+                'XY plot needs two numbers. Example: msg.torque_xyz[0], msg.thrust_xyz[2]')
+        else:
+            self._extraction_expression_box.setToolTip(
+                'Example: msg.torque_xyz   or   msg.torque_xyz[0]')
 
         # Node ID filter
         self._node_id_filter_checkbox = QCheckBox('Accept messages only from specific node', self)
@@ -261,8 +288,12 @@ class NewValueExtractorWindow(QDialog):
             return
 
         if len(data_type.fields):
-            self._extraction_expression_box.setText(
-                '%s.%s' % (EXPRESSION_VARIABLE_FOR_MESSAGE, data_type.fields[0].name))
+            default_expr = _default_extraction_expression(data_type, self._xy_mode)
+            if default_expr:
+                self._extraction_expression_box.setText(default_expr)
+            else:
+                self._extraction_expression_box.setText(
+                    '%s.%s' % (EXPRESSION_VARIABLE_FOR_MESSAGE, data_type.fields[0].name))
         else:
             self._extraction_expression_box.clear()
 
